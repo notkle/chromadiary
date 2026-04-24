@@ -887,24 +887,37 @@ Diary entry: ${text}`;
 
     let songs = [];
     let raw = '';
-    try {
-      const playlistModels = ['nvidia/nemotron-3-super-120b-a12b:free', 'arcee-ai/trinity-large-preview:free'];
-      for (const pm of playlistModels) {
-        const res = await fetch(WORKER_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: songPrompt, model: pm })
-        });
-        const data = await res.json();
-        raw = data?.choices?.[0]?.message?.content || '';
-        if (raw) break;
+
+    const simpleFallbackPrompt = `Recommend 15 songs that emotionally complement this mood: Rage ${r100}/100, Glee ${g100}/100, Bleakness ${b100}/100, Serenity ${s100}/100. Return ONLY a JSON array: [{"title":"Song Title","artist":"Artist Name"}]`;
+
+    const playlistModels = ['nvidia/nemotron-3-super-120b-a12b:free', 'arcee-ai/trinity-large-preview:free'];
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const promptToUse = attempt === 0 ? songPrompt : simpleFallbackPrompt;
+      if (attempt === 1) setPlaylistStatus('refining playlist...');
+      try {
+        raw = '';
+        for (const pm of playlistModels) {
+          const res = await fetch(WORKER_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: promptToUse, model: pm })
+          });
+          const data = await res.json();
+          raw = data?.choices?.[0]?.message?.content || '';
+          if (raw) break;
+        }
+        const arrayStart = raw.indexOf('[');
+        const arrayEnd = raw.lastIndexOf(']');
+        if (arrayStart === -1 || arrayEnd === -1) continue;
+        songs = JSON.parse(raw.substring(arrayStart, arrayEnd + 1));
+        if (songs.length > 0) break;
+      } catch(e) {
+        console.log('attempt', attempt, 'error:', e.message);
       }
-      const arrayStart = raw.indexOf('[');
-      const arrayEnd = raw.lastIndexOf(']');
-      if (arrayStart === -1 || arrayEnd === -1) throw new Error('no JSON array in: ' + raw.substring(0, 100));
-      songs = JSON.parse(raw.substring(arrayStart, arrayEnd + 1));
-    } catch(e) {
-      console.log('song gen error:', e.message, 'raw:', raw.substring(0, 200));
+    }
+
+    if (!songs.length) {
       setPlaylistStatus('could not generate song list. try again.');
       if (btn) btn.disabled = false;
       return;
