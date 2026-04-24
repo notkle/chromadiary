@@ -104,6 +104,13 @@
     .swatch:hover { transform: scale(1.06); box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
     .swatch.active { transform: scale(1.06); box-shadow: 0 0 0 2px var(--accent); }
 
+    .swatch-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border-radius: 4px;
+    }
+
     .swatch-date {
       position: absolute;
       bottom: 4px;
@@ -429,10 +436,33 @@
       const label = (date.getMonth()+1) + '/' + date.getDate();
       const swatch = document.createElement('div');
       swatch.className = 'swatch';
-      swatch.style.background = `rgb(${entry.r},${entry.g},${entry.b})`;
-      swatch.innerHTML = `<div class="swatch-date">${label}</div>`;
+      swatch.innerHTML = `<canvas class="swatch-canvas" width="80" height="80"></canvas><div class="swatch-date">${label}</div>`;
       swatch.onclick = () => toggleDetail(i, swatch, entry, date);
       grid.appendChild(swatch);
+      // draw vignette after appending
+      requestAnimationFrame(() => {
+        const canvas = swatch.querySelector('.swatch-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width, H = canvas.height;
+        const s = entry.s || 128;
+        ctx.fillStyle = `rgb(${entry.r},${entry.g},${entry.b})`;
+        ctx.fillRect(0, 0, W, H);
+        const vigIntensity = 1 - (s / 255);
+        const brightIntensity = s / 255;
+        if (vigIntensity > 0.05) {
+          const grad = ctx.createRadialGradient(W/2,H/2,H*0.1,W/2,H/2,Math.sqrt(W*W+H*H)/2);
+          grad.addColorStop(0, 'rgba(0,0,0,0)');
+          grad.addColorStop(1, `rgba(0,0,0,${(vigIntensity*0.75).toFixed(2)})`);
+          ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+        }
+        if (brightIntensity > 0.05) {
+          const grad2 = ctx.createRadialGradient(W/2,H/2,H*0.15,W/2,H/2,Math.sqrt(W*W+H*H)/2);
+          grad2.addColorStop(0, 'rgba(255,255,255,0)');
+          grad2.addColorStop(1, `rgba(255,255,255,${(brightIntensity*0.45).toFixed(2)})`);
+          ctx.fillStyle = grad2; ctx.fillRect(0,0,W,H);
+        }
+      });
     });
   }
 
@@ -474,8 +504,13 @@
           <div class="rgb-track"><div class="rgb-fill" style="width:${entry.b100}%; background:rgba(100,150,255,0.8)"></div></div>
           <span class="rgb-val">${entry.b100}</span>
         </div>
+        <div class="rgb-bar-row">
+          <span class="rgb-label">S</span>
+          <div class="rgb-track"><div class="rgb-fill" style="width:${entry.s100 || 50}%; background:linear-gradient(to right, #333, #fff)"></div></div>
+          <span class="rgb-val">${entry.s100 || 50}</span>
+        </div>
       </div>
-      <div class="rgb-legend">R = Rage · G = Glee · B = Bleakness</div>
+      <div class="rgb-legend">R = Rage · G = Glee · B = Bleakness · S = Serenity</div>
       <hr class="divider"/>
       <div class="reflection-label">reflection</div>
       <div class="reflection-text">${entry.reflection}</div>
