@@ -831,6 +831,8 @@ Diary entry: ${text}`;
     ytApiReady = true;
   };
 
+  const WORKER_URL = 'https://chromadiary-proxy.sotempyhehe.workers.dev';
+
   function setPlaylistStatus(msg) {
     const el = document.getElementById('playlistStatus');
     if (el) el.innerHTML = msg ? '<div class="playlist-status">' + msg + '</div>' : '';
