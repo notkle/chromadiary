@@ -845,22 +845,12 @@ Diary entry: ${text}`;
     const g100 = Math.round(g / 255 * 100);
     const b100 = Math.round(b / 255 * 100);
 
-    const songPrompt = `You are a deeply thoughtful music curator. Based on someone's emotional state, recommend exactly 15 songs.
-
-Their emotional metrics today (each 0-100):
-- Rage: ${r100}/100 (emotional intensity, agitation, heat)
-- Glee: ${g100}/100 (lightness, joy, warmth)
-- Bleakness: ${b100}/100 (heaviness, weight, quiet sorrow)
-
-Philosophy: The playlist should COMPLEMENT and gently accompany these emotions, not match them literally or try to fix them. High rage means music that meets the heat and gives it somewhere to breathe. High bleakness means music that sits with the feeling honestly and inquiringly, not hopelessly. Think companionship for the emotion, not a fix.
-
-Return ONLY a JSON array of 15 objects, nothing else, no markdown:
-[{"title": "Song Title", "artist": "Artist Name"}, ...]`;
+    const songPrompt = `You are a deeply thoughtful music curator. Based on someone's emotional state, recommend exactly 15 songs.\n\nTheir emotional metrics today (each 0-100):\n- Rage: ${r100}/100\n- Glee: ${g100}/100\n- Bleakness: ${b100}/100\n\nThe playlist should complement and accompany these emotions, not fix them. Return ONLY a JSON array of 15 objects, no markdown:\n[{"title": "Song Title", "artist": "Artist Name"}, ...]`;
 
     let songs = [];
+    let raw = '';
     try {
       const playlistModels = ['nvidia/nemotron-3-super-120b-a12b:free', 'arcee-ai/trinity-large-preview:free'];
-      let raw = '';
       for (const pm of playlistModels) {
         const res = await fetch(WORKER_URL, {
           method: 'POST',
@@ -871,8 +861,124 @@ Return ONLY a JSON array of 15 objects, nothing else, no markdown:
         raw = data?.choices?.[0]?.message?.content || '';
         if (raw) break;
       }
-      // extract JSON array from response robustly
-      let arrayStart = raw.indexOf('[');
-      let arrayEnd = raw.lastIndexOf(']');
-      if (arrayStart === -1 || arrayEnd === -1) throw new Error('no JSON array found');
+      const arrayStart = raw.indexOf('[');
+      const arrayEnd = raw.lastIndexOf(']');
+      if (arrayStart === -1 || arrayEnd === -1) throw new Error('no JSON array in: ' + raw.substring(0, 100));
       songs = JSON.parse(raw.substring(arrayStart, arrayEnd + 1));
+    } catch(e) {
+      console.log('song gen error:', e.message, 'raw:', raw.substring(0, 200));
+      setPlaylistStatus('could not generate song list. try again.');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    setPlaylistStatus('searching for tracks...');
+    ytVideoIds = [];
+    for (const song of songs) {
+      try {
+        const res = await fetch(WORKER_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'youtube_search',
+            query: song.title + ' ' + song.artist + ' official audio'
+          })
+        });
+        const data = await res.json();
+        const items = data?.items || [];
+        for (const item of items) {
+          if (item?.id?.videoId) {
+            ytVideoIds.push({ id: item.id.videoId, title: song.title, artist: song.artist });
+            break;
+          }
+        }
+      } catch(e) { /* skip */ }
+    }
+
+    if (ytVideoIds.length === 0) {
+      setPlaylistStatus('could not find tracks. try again.');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    setPlaylistStatus('');
+    renderPlaylist();
+    if (btn) btn.disabled = false;
+  }
+
+  function renderPlaylist() {
+    const resultEl = document.getElementById('playlistResult');
+    if (!resultEl) return;
+
+    const trackHTML = ytVideoIds.map((t, i) => `
+      <div class="track-row ${i === 0 ? 'playing' : ''}" onclick="playTrack(${i})" id="track-${i}">
+        <span class="track-num ${i === 0 ? 'playing-indicator' : ''}" id="tracknum-${i}">${i === 0 ? '' : i + 1}</span>
+        <div class="track-info">
+          <div class="track-name">${t.title}</div>
+          <div class="track-artist">${t.artist}</div>
+        </div>
+      </div>
+    `).join('');
+
+    resultEl.innerHTML = `
+      <div class="yt-player-wrap" id="ytPlayerWrap">
+        <div id="ytPlayerEl"></div>
+      </div>
+      <div class="yt-controls">
+        <button class="yt-ctrl-btn" onclick="playPrev()">← prev</button>
+        <div class="yt-track-info" id="ytTrackInfo">${ytVideoIds[0].title} — ${ytVideoIds[0].artist}</div>
+        <button class="yt-ctrl-btn" onclick="playNext()">next →</button>
+      </div>
+      <div class="playlist-tracks">${trackHTML}</div>
+    `;
+
+    ytCurrentIndex = 0;
+    initYTPlayer(ytVideoIds[0].id);
+  }
+
+  function initYTPlayer(videoId) {
+    if (ytPlayer) {
+      ytPlayer.loadVideoById(videoId);
+      return;
+    }
+    if (!ytApiReady) {
+      setTimeout(() => initYTPlayer(videoId), 300);
+      return;
+    }
+    ytPlayer = new YT.Player('ytPlayerEl', {
+      height: '180',
+      width: '100%',
+      videoId: videoId,
+      playerVars: { autoplay: 1, controls: 1, rel: 0, modestbranding: 1, iv_load_policy: 3 },
+      events: {
+        onStateChange: function(e) {
+          if (e.data === YT.PlayerState.ENDED) playNext();
+        }
+      }
+    });
+  }
+
+  function playTrack(index) {
+    ytCurrentIndex = index;
+    document.querySelectorAll('.track-row').forEach((r, i) => r.classList.toggle('playing', i === index));
+    document.querySelectorAll('.track-num').forEach((n, i) => {
+      if (i === index) { n.classList.add('playing-indicator'); n.textContent = ''; }
+      else { n.classList.remove('playing-indicator'); n.textContent = i + 1; }
+    });
+    const t = ytVideoIds[index];
+    const info = document.getElementById('ytTrackInfo');
+    if (info) info.textContent = t.title + ' — ' + t.artist;
+    initYTPlayer(t.id);
+  }
+
+  function playNext() {
+    if (ytCurrentIndex < ytVideoIds.length - 1) playTrack(ytCurrentIndex + 1);
+  }
+
+  function playPrev() {
+    if (ytCurrentIndex > 0) playTrack(ytCurrentIndex - 1);
+  }
+
+</script>
+</body>
+</html>
