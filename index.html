@@ -951,7 +951,7 @@ Diary entry: ${text}`;
       height: '180',
       width: '100%',
       videoId: videoId,
-      playerVars: { autoplay: 1, controls: 1, rel: 0, modestbranding: 1, iv_load_policy: 3 },
+      playerVars: { autoplay: 1, controls: 1, rel: 0, modestbranding: 1, iv_load_policy: 3, vq: 'hd1080' },
       events: {
         onStateChange: function(e) {
           if (e.data === YT.PlayerState.ENDED) playNext();
