@@ -831,6 +831,11 @@ Diary entry: ${text}`;
     ytApiReady = true;
   };
 
+  function setPlaylistStatus(msg) {
+    const el = document.getElementById('playlistStatus');
+    if (el) el.innerHTML = msg ? '<div class="playlist-status">' + msg + '</div>' : '';
+  }
+
   async function generateSongs(r, g, b) {
     const btn = document.getElementById('makePlaylistBtn');
     if (btn) btn.disabled = true;
