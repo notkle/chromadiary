@@ -841,7 +841,7 @@ Diary entry: ${text}`;
   async function generateSongs(r, g, b) {
     const btn = document.getElementById('makePlaylistBtn');
     if (btn) btn.disabled = true;
-    setPlaylistStatus('asking ai for song recommendations...');
+    setPlaylistStatus('building your playlist...');
 
     const r100 = Math.round(r / 255 * 100);
     const g100 = Math.round(g / 255 * 100);
