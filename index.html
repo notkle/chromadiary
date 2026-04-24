@@ -806,7 +806,7 @@ Diary entry: ${text}`;
     const W = canvas.width, H = canvas.height;
 
     // base color fill
-    ctx.fillStyle = \`rgb(\${r},\${g},\${b})\`;
+    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
     ctx.fillRect(0, 0, W, H);
 
     // serenity vignette from corners
@@ -817,8 +817,8 @@ Diary entry: ${text}`;
     if (vigIntensity > 0.05) {
       // dark vignette for low serenity
       const grad = ctx.createRadialGradient(W/2, H/2, H*0.1, W/2, H/2, Math.sqrt(W*W+H*H)/2);
-      grad.addColorStop(0, \`rgba(0,0,0,0)\`);
-      grad.addColorStop(1, \`rgba(0,0,0,\${(vigIntensity * 0.75).toFixed(2)})\`);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(0,0,0,' + (vigIntensity * 0.75).toFixed(2) + ')');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, W, H);
     }
@@ -826,8 +826,8 @@ Diary entry: ${text}`;
     if (brightIntensity > 0.05) {
       // light vignette from corners for high serenity
       const grad2 = ctx.createRadialGradient(W/2, H/2, H*0.15, W/2, H/2, Math.sqrt(W*W+H*H)/2);
-      grad2.addColorStop(0, \`rgba(255,255,255,0)\`);
-      grad2.addColorStop(1, \`rgba(255,255,255,\${(brightIntensity * 0.45).toFixed(2)})\`);
+      grad2.addColorStop(0, 'rgba(255,255,255,0)');
+      grad2.addColorStop(1, 'rgba(255,255,255,' + (brightIntensity * 0.45).toFixed(2) + ')');
       ctx.fillStyle = grad2;
       ctx.fillRect(0, 0, W, H);
     }
